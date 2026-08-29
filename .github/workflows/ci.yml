@@ -22,6 +22,9 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────
   lint:
     name: fmt + clippy (ubuntu)
+    # qshare-assets embeds web/dist at compile time — clippy needs the built
+    # frontend, so lint depends on the web job that produces it.
+    needs: web
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,6 +45,12 @@ jobs:
             crates/qshare-gui
             crates/qshare-assets
           cache-on-failure: true
+
+      - name: Download web/dist
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
 
       - name: cargo fmt --check
         run: cargo fmt --all -- --check
@@ -177,14 +186,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          BIN="target/${{ matrix.target }}/release/qshare${{ matrix.os == 'windows-latest' && '.exe' || '' }}"
+          BIN="target/${{ matrix.target }}/release/qshare-cli${{ matrix.os == 'windows-latest' && '.exe' || '' }}"
           "$BIN" --version
 
       - name: Smoke test (help)
         shell: bash
         run: |
           set -euo pipefail
-          BIN="target/${{ matrix.target }}/release/qshare${{ matrix.os == 'windows-latest' && '.exe' || '' }}"
+          BIN="target/${{ matrix.target }}/release/qshare-cli${{ matrix.os == 'windows-latest' && '.exe' || '' }}"
           "$BIN" --help | head -20
 
       - name: Upload qshare binary
@@ -192,7 +201,7 @@ jobs:
         with:
           name: ${{ matrix.asset_name }}
           path: |
-            target/${{ matrix.target }}/release/qshare
-            target/${{ matrix.target }}/release/qshare.exe
+            target/${{ matrix.target }}/release/qshare-cli
+            target/${{ matrix.target }}/release/qshare-cli.exe
           if-no-files-found: error
           retention-days: 14

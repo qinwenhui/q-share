@@ -151,6 +151,7 @@ jobs:
 
       # Map bin → package. CLI = qshare-cli, TUI = qshare-tui, GUI = qshare-gui.
       - name: cargo build --release
+        shell: bash
         run: |
           case "${{ matrix.bin }}" in
             qshare-cli) PKG=qshare-cli ;;
@@ -159,7 +160,6 @@ jobs:
             *) echo "unknown bin ${{ matrix.bin }}"; exit 1 ;;
           esac
           cargo build --release --locked -p "$PKG" --target ${{ matrix.target }}
-          shell=$BASH
 
       - name: Stage binary
         shell: bash
