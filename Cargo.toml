@@ -9,7 +9,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.88"
 license = "MIT"
@@ -33,7 +33,7 @@ exclude = [
 [workspace.metadata]
 # Used by `cargo-bundle` and friends.
 "cargo-bundle/bundle-name" = "q-share"
-"cargo-bundle/bundle-version" = "0.1.0"
+"cargo-bundle/bundle-version" = "0.1.1"
 "cargo-bundle/bundle-identifier" = "dev.qshare.app"
 
 [workspace.dependencies]

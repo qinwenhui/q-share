@@ -14,7 +14,7 @@
 ```
 $ qshare-cli -r ~/Videos
 
-  q-share  0.1.0
+  q-share  0.1.1
   ─────────────────────────────────────────────────
   shared  /Users/me/Videos
   url     http://192.168.1.42:8888

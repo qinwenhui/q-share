@@ -708,11 +708,27 @@ impl Drop for App {
     }
 }
 
+/// Default share root: the user's home directory.
+///
+/// Never fall back to `current_dir()` here: macOS launches GUI apps from
+/// Finder/Dock with cwd = "/", so the old default would hand the whole
+/// filesystem to the share server the moment the user hits start. HOME
+/// (USERPROFILE on Windows) is what they actually mean.
+fn default_root() -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    let home = std::env::var_os("USERPROFILE");
+    #[cfg(not(target_os = "windows"))]
+    let home = std::env::var_os("HOME");
+
+    home.map(PathBuf::from)
+        .or_else(|| std::env::current_dir().ok())
+}
+
 impl App {
     fn new(args: Args) -> Self {
         let initial_root = args
             .root
-            .or_else(|| std::env::current_dir().ok())
+            .or_else(default_root)
             .map(|p| p.to_string_lossy().into_owned())
             .unwrap_or_default();
         let ip_options = list_ip_options();
