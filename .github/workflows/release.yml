@@ -53,77 +53,34 @@ jobs:
           retention-days: 7
 
   # ─────────────────────────────────────────────────────────────────────
-  # 2. Build matrix — every binary on every platform we ship.
-  #    CLI  : Linux + macOS (x86_64 + aarch64) + Windows
-  #    TUI  : same
-  #    GUI  : macOS + Windows only (iced/wgpu on Linux CI is GPU-unreliable)
+  # 2. Build matrix — one job per platform, all apps in one archive.
+  #    每个平台一个压缩包，包含该平台全部二进制：
+  #      Windows : qshare.exe（GUI，内嵌图标）+ qshare-cli.exe + qshare-tui.exe
+  #      macOS   : q-share.app（GUI bundle）+ qshare-cli + qshare-tui
+  #      Linux   : qshare-cli + qshare-tui（iced/wgpu 在 Linux CI 上不可靠）
   # ─────────────────────────────────────────────────────────────────────
   build:
-    name: build (${{ matrix.label }})
+    name: build (${{ matrix.target }})
     needs: web
     strategy:
       fail-fast: false
       matrix:
         include:
-          # ── CLI ──
-          - label: qshare-cli / x86_64-unknown-linux-gnu
+          - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            bin: qshare-cli
+            apps: cli tui
             archive: tar.xz
-          - label: qshare-cli / x86_64-apple-darwin
+          - target: x86_64-apple-darwin
             os: macos-latest
-            target: x86_64-apple-darwin
-            bin: qshare-cli
+            apps: cli tui gui
             archive: tar.xz
-          - label: qshare-cli / aarch64-apple-darwin
+          - target: aarch64-apple-darwin
             os: macos-latest
-            target: aarch64-apple-darwin
-            bin: qshare-cli
+            apps: cli tui gui
             archive: tar.xz
-          - label: qshare-cli / x86_64-pc-windows-msvc
+          - target: x86_64-pc-windows-msvc
             os: windows-latest
-            target: x86_64-pc-windows-msvc
-            bin: qshare-cli.exe
-            archive: zip
-
-          # ── TUI ──
-          - label: qshare-tui / x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            bin: qshare-tui
-            archive: tar.xz
-          - label: qshare-tui / x86_64-apple-darwin
-            os: macos-latest
-            target: x86_64-apple-darwin
-            bin: qshare-tui
-            archive: tar.xz
-          - label: qshare-tui / aarch64-apple-darwin
-            os: macos-latest
-            target: aarch64-apple-darwin
-            bin: qshare-tui
-            archive: tar.xz
-          - label: qshare-tui / x86_64-pc-windows-msvc
-            os: windows-latest
-            target: x86_64-pc-windows-msvc
-            bin: qshare-tui.exe
-            archive: zip
-
-          # ── GUI (macOS + Windows only) ──
-          - label: qshare / x86_64-apple-darwin
-            os: macos-latest
-            target: x86_64-apple-darwin
-            bin: qshare
-            archive: tar.xz
-          - label: qshare / aarch64-apple-darwin
-            os: macos-latest
-            target: aarch64-apple-darwin
-            bin: qshare
-            archive: tar.xz
-          - label: qshare / x86_64-pc-windows-msvc
-            os: windows-latest
-            target: x86_64-pc-windows-msvc
-            bin: qshare.exe
+            apps: cli tui gui
             archive: zip
     runs-on: ${{ matrix.os }}
     steps:
@@ -151,51 +108,61 @@ jobs:
           name: web-dist
           path: web/dist
 
-      # Map bin → package. CLI = qshare-cli, TUI = qshare-tui, GUI = qshare-gui.
-      # Windows 的 bin 带 .exe 后缀（qshare-cli.exe），先去掉再匹配。
+      # 逐个构建该平台需要的包。qshare-assets 在编译期嵌入 web/dist，
+      # 所以每个 app 都自带前端资源；cargo 增量缓存让后几个包很快。
       - name: cargo build --release
         shell: bash
         run: |
-          bin="${{ matrix.bin }}"
-          bin="${bin%.exe}"
-          case "$bin" in
-            qshare-cli) PKG=qshare-cli ;;
-            qshare-tui) PKG=qshare-tui ;;
-            qshare)     PKG=qshare-gui ;;
-            *) echo "unknown bin ${{ matrix.bin }}"; exit 1 ;;
-          esac
-          cargo build --release --locked -p "$PKG" --target ${{ matrix.target }}
+          set -euo pipefail
+          cargo build --release --locked -p qshare-cli --target ${{ matrix.target }}
+          cargo build --release --locked -p qshare-tui --target ${{ matrix.target }}
+          if [[ " ${{ matrix.apps }} " == *" gui "* ]]; then
+            cargo build --release --locked -p qshare-gui --target ${{ matrix.target }}
+          fi
 
-      # macOS GUI ships as a proper .app bundle — a bare binary has no icon
-      # in the Dock/Finder. Assemble q-share.app (Info.plist + AppIcon.icns),
-      # ad-hoc sign it, and stage the bundle. Everything else stays a bare
-      # binary (CLI/TUI, or Windows GUI which uses the embedded .ico).
-      - name: Stage binary
+      # 把所有二进制（和 macOS 的 .app bundle）放进 dist/，再整体打包。
+      # macOS GUI 必须打成 .app（Info.plist + AppIcon.icns + ad-hoc 签名），
+      # 否则 Dock/访达没有图标；Windows GUI 的图标由 build.rs 内嵌进 exe。
+      - name: Stage binaries
         shell: bash
         run: |
           set -euo pipefail
+          exe=""
+          [[ "${{ matrix.os }}" == "windows-latest" ]] && exe=".exe"
           mkdir -p dist
-          if [[ "${{ matrix.os }}" == "macos-latest" && "${{ matrix.bin }}" == "qshare" ]]; then
-            bundle="dist/q-share.app"
-            mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
-            sed -e "s/@VERSION@/${GITHUB_REF_NAME#v}/g" \
-                -e "s/@YEAR@/$(date +%Y)/g" \
-                packaging/Info.plist > "$bundle/Contents/Info.plist"
-            cp "target/${{ matrix.target }}/release/qshare" "$bundle/Contents/MacOS/qshare"
-            cp crates/qshare-gui/assets/icon.icns "$bundle/Contents/Resources/AppIcon.icns"
-            codesign --force --deep --sign - "$bundle"
-          else
-            cp "target/${{ matrix.target }}/release/${{ matrix.bin }}" dist/
+          cp "target/${{ matrix.target }}/release/qshare-cli$exe" "dist/qshare-cli$exe"
+          cp "target/${{ matrix.target }}/release/qshare-tui$exe" "dist/qshare-tui$exe"
+          if [[ " ${{ matrix.apps }} " == *" gui "* ]]; then
+            if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+              bundle="dist/q-share.app"
+              mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
+              sed -e "s/@VERSION@/${GITHUB_REF_NAME#v}/g" \
+                  -e "s/@YEAR@/$(date +%Y)/g" \
+                  packaging/Info.plist > "$bundle/Contents/Info.plist"
+              cp "target/${{ matrix.target }}/release/qshare" "$bundle/Contents/MacOS/qshare"
+              cp crates/qshare-gui/assets/icon.icns "$bundle/Contents/Resources/AppIcon.icns"
+              codesign --force --deep --sign - "$bundle"
+            else
+              cp "target/${{ matrix.target }}/release/qshare$exe" "dist/qshare$exe"
+            fi
           fi
+          ls -la dist
 
       - name: Smoke test (--version)
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ matrix.os }}" == "macos-latest" && "${{ matrix.bin }}" == "qshare" ]]; then
+          exe=""
+          [[ "${{ matrix.os }}" == "windows-latest" ]] && exe=".exe"
+          for b in qshare-cli qshare-tui; do
+            if [[ -f "dist/$b$exe" ]]; then
+              ./dist/$b$exe --version
+            fi
+          done
+          if [[ -d "dist/q-share.app" ]]; then
             ./dist/q-share.app/Contents/MacOS/qshare --version
-          else
-            ./dist/${{ matrix.bin }} --version
+          elif [[ -f "dist/qshare$exe" ]]; then
+            ./dist/qshare$exe --version
           fi
 
       - name: Package archive
@@ -204,23 +171,21 @@ jobs:
           set -euo pipefail
           cd dist
           ARCHIVE_NAME="${{ github.event.repository.name }}-${{ matrix.target }}"
-          if [[ "${{ matrix.os }}" == "macos-latest" && "${{ matrix.bin }}" == "qshare" ]]; then
-            tar -cJf "${ARCHIVE_NAME}.tar.xz" q-share.app
-            echo "ASSET=${ARCHIVE_NAME}.tar.xz" >> "$GITHUB_ENV"
-          elif [[ "${{ matrix.archive }}" == "tar.xz" ]]; then
-            tar -cJf "${ARCHIVE_NAME}.tar.xz" "${{ matrix.bin }}"
-            echo "ASSET=${ARCHIVE_NAME}.tar.xz" >> "$GITHUB_ENV"
+          if [[ "${{ matrix.archive }}" == "tar.xz" ]]; then
+            ext="tar.xz"
+            tar -cJf "${ARCHIVE_NAME}.${ext}" ./*
           else
             # zip on Windows
-            7z.exe a "${ARCHIVE_NAME}.zip" "${{ matrix.bin }}" > /dev/null
-            echo "ASSET=${ARCHIVE_NAME}.zip" >> "$GITHUB_ENV"
+            ext="zip"
+            7z.exe a "${ARCHIVE_NAME}.${ext}" . > /dev/null
           fi
+          echo "ASSET=${ARCHIVE_NAME}.${ext}" >> "$GITHUB_ENV"
+          ls -la
 
       - name: Upload artifact (for debugging)
         uses: actions/upload-artifact@v4
         with:
-          # matrix.label 含斜杠，artifact 名不允许，改用 bin-target（无斜杠）
-          name: ${{ matrix.bin }}-${{ matrix.target }}
+          name: q-share-${{ matrix.target }}
           path: dist/${{ env.ASSET }}
           retention-days: 7
 
