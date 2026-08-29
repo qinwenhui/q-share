@@ -91,6 +91,14 @@ $ qshare
 
 Pre-built binaries for Linux, macOS and Windows are attached to each [Release](https://github.com/qinwenhui/q-share/releases). You can also build from source:
 
+> **macOS first-run**: the app is ad-hoc signed, not notarized, so Finder may
+> warn it is from an unidentified developer. Right-click the app and choose
+> **Open**, or clear the quarantine flag once:
+>
+> ```bash
+> xattr -cr q-share.app
+> ```
+
 ```bash
 git clone https://github.com/qinwenhui/q-share.git
 cd q-share

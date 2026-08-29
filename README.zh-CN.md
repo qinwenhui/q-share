@@ -91,6 +91,13 @@ $ qshare
 
 Linux、macOS、Windows 的预编译二进制挂在每个 [Release](https://github.com/qinwenhui/q-share/releases) 页面。也可以从源码构建：
 
+> **macOS 首次打开**：应用是 ad-hoc 签名、未做 Apple 公证，Finder 可能会提示
+> "无法验证开发者"。右键点应用选 **打开**，或执行一次清除隔离标记：
+>
+> ```bash
+> xattr -cr q-share.app
+> ```
+
 ```bash
 git clone https://github.com/qinwenhui/q-share.git
 cd q-share
