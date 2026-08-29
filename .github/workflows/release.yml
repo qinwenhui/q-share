@@ -162,7 +162,13 @@ jobs:
           if [[ -d "dist/q-share.app" ]]; then
             ./dist/q-share.app/Contents/MacOS/qshare --version
           elif [[ -f "dist/qshare$exe" ]]; then
-            ./dist/qshare$exe --version
+            if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+              # windows_subsystem=windows 的 GUI exe 没有控制台输出（去黑框的
+              # 副作用），--version 无处可见，只验证产物存在。
+              echo "ok: dist/qshare.exe present"
+            else
+              ./dist/qshare$exe --version
+            fi
           fi
 
       - name: Package archive

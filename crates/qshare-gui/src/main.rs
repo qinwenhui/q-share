@@ -1,3 +1,8 @@
+// Windows: link as a GUI-subsystem app so launching qshare.exe doesn't pop a
+// black console window that stays open until the app exits. Other targets
+// ignore this attribute.
+#![windows_subsystem = "windows"]
+
 //! q-share native GUI (iced) — terminal aesthetic, monospace, phosphor green.
 //!
 //! Design language: hacker terminal / cyberpunk console.
