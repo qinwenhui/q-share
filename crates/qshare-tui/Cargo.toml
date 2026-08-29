@@ -1,0 +1,32 @@
+[package]
+name = "qshare-tui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "q-share terminal UI (ratatui) — keyboard-driven dashboard"
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[[bin]]
+name = "qshare-tui"
+path = "src/main.rs"
+
+[dependencies]
+qshare-core = { path = "../qshare-core" }
+
+ratatui.workspace = true
+crossterm.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+clap.workspace = true
+qrcode.workspace = true
+anyhow.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+serde_json.workspace = true

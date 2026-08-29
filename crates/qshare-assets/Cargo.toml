@@ -1,0 +1,17 @@
+[package]
+name = "qshare-assets"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "rust-embed bundle of the SolidJS frontend (web/dist/), compiled into every q-share binary."
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[dependencies]
+rust-embed = { version = "8", features = ["include-exclude"] }
+mime_guess = { workspace = true }
+bytes = "1"

@@ -1,0 +1,26 @@
+[package]
+name = "qshare-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Headless CLI for q-share: pick a directory, get a URL and QR code on stdout."
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[[bin]]
+name = "qshare-cli"
+path = "src/main.rs"
+
+[dependencies]
+qshare-core = { path = "../qshare-core" }
+qshare-assets = { path = "../qshare-assets" }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+qrcode = { workspace = true }

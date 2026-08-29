@@ -1,0 +1,85 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/qshare-core",
+    "crates/qshare-cli",
+    "crates/qshare-assets",
+    "crates/qshare-gui",
+    "crates/qshare-tui",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+license = "MIT"
+authors = ["qinwh"]
+description = "Zero-config LAN file sharing — pick a folder, get a URL + QR code, share with anyone on the network."
+documentation = "https://docs.rs/qshare-core"
+homepage = "https://qinwh.cn"
+repository = "https://github.com/qinwenhui/q-share"
+readme = "README.md"
+keywords = ["file-sharing", "lan", "http-server", "qr-code", "zero-config"]
+categories = ["filesystem", "network-programming", "web-programming::http-server"]
+exclude = [
+    "target",
+    "node_modules",
+    "web/dist",
+    "web/node_modules",
+    ".DS_Store",
+    "*.log",
+]
+
+[workspace.metadata]
+# Used by `cargo-bundle` and friends.
+"cargo-bundle/bundle-name" = "q-share"
+"cargo-bundle/bundle-version" = "0.1.0"
+"cargo-bundle/bundle-identifier" = "dev.qshare.app"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.8", features = ["http2", "ws"] }
+tower = "0.5"
+tower-http = { version = "0.7", features = ["fs", "cors", "compression-gzip", "trace"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+mime_guess = "2"
+percent-encoding = "2"
+async-stream = "0.3"
+futures = "0.3"
+parking_lot = "0.12"
+dashmap = "6"
+uuid = { version = "1", features = ["v4"] }
+clap = { version = "4", features = ["derive", "env"] }
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+notify = "8"
+notify-debouncer-full = "0.6"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp"] }
+sha2 = "0.10"
+md-5 = "0.10"
+ignore = "0.4"
+
+# Phase 4: GUI / TUI / discovery
+iced = { version = "0.13", default-features = false, features = ["wgpu", "tokio", "svg", "advanced", "lazy"] }
+ratatui = "0.29"
+crossterm = "0.28"
+mdns-sd = "0.11"
+if-addrs = "0.13"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"
+
+# GUI binary needs more stack because iced/wgpu spin up async runtimes.
+[profile.release.package.qshare-gui]
+opt-level = 3
+
+[profile.dev.package.qshare-gui]
+opt-level = 1

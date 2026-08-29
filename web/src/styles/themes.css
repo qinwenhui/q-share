@@ -1,0 +1,115 @@
+/* Theme presets — keyed off [data-theme="<id>"] on <html>.
+ *
+ * The user-overridable tokens (--accent, --radius, --row-h) are written
+ * imperatively by stores/theme.ts so the accent picker doesn't have to
+ * know about every theme. Everything else (palette, shadow tone, tile
+ * tints) lives here.
+ *
+ * The midnight preset intentionally matches the `:root` defaults in
+ * global.css so a fresh user with no localStorage gets midnight without
+ * any FOUC. The other presets define a complete alternative palette.
+ */
+
+[data-theme='midnight'] {
+  --bg: #0b0d12;
+  --bg-elev: #141821;
+  --bg-elev-2: #1c2230;
+  --bg-hover: #232a3a;
+  --fg: #e6e8ee;
+  --fg-dim: #9aa3b2;
+  --fg-faint: #5b6478;
+  --border: #232a3a;
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-2: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+  --tile-folder: rgba(77, 171, 255, 0.15);
+  --tile-image: rgba(81, 207, 102, 0.10);
+  --tile-video: rgba(77, 171, 255, 0.10);
+  --tile-audio: rgba(255, 159, 64, 0.12);
+  --tile-doc: rgba(154, 163, 178, 0.10);
+}
+
+[data-theme='daylight'] {
+  --bg: #fafbfc;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #f3f5f8;
+  --bg-hover: #eaeef3;
+  --fg: #1a1d23;
+  --fg-dim: #5b6478;
+  --fg-faint: #9aa3b2;
+  --border: #e3e7ee;
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-2: 0 8px 32px rgba(0, 0, 0, 0.12);
+
+  --tile-folder: rgba(0, 122, 255, 0.10);
+  --tile-image: rgba(52, 168, 83, 0.10);
+  --tile-video: rgba(0, 122, 255, 0.08);
+  --tile-audio: rgba(255, 138, 0, 0.10);
+  --tile-doc: rgba(60, 70, 90, 0.06);
+}
+
+/* Forest — green-leaning, slightly desaturated darks. */
+[data-theme='forest'] {
+  --bg: #0d1410;
+  --bg-elev: #162019;
+  --bg-elev-2: #1f2c23;
+  --bg-hover: #28392e;
+  --fg: #e4ece6;
+  --fg-dim: #94a59a;
+  --fg-faint: #5e6f63;
+  --border: #243027;
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.28);
+  --shadow-2: 0 8px 32px rgba(0, 0, 0, 0.42);
+
+  --tile-folder: rgba(72, 187, 120, 0.18);
+  --tile-image: rgba(72, 187, 120, 0.12);
+  --tile-video: rgba(99, 179, 237, 0.12);
+  --tile-audio: rgba(237, 187, 72, 0.14);
+  --tile-doc: rgba(154, 173, 154, 0.12);
+}
+
+/* Sunset — warm orange/red accents on a deep purple-black. */
+[data-theme='sunset'] {
+  --bg: #15101a;
+  --bg-elev: #1f1828;
+  --bg-elev-2: #2b2034;
+  --bg-hover: #382942;
+  --fg: #f0e6ee;
+  --fg-dim: #b099b0;
+  --fg-faint: #6e5970;
+  --border: #2c2235;
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.30);
+  --shadow-2: 0 8px 32px rgba(0, 0, 0, 0.45);
+
+  --tile-folder: rgba(255, 138, 80, 0.18);
+  --tile-image: rgba(255, 138, 80, 0.12);
+  --tile-video: rgba(237, 100, 100, 0.14);
+  --tile-audio: rgba(255, 207, 102, 0.14);
+  --tile-doc: rgba(180, 160, 180, 0.10);
+}
+
+/* Sakura — soft pink/cherry-blossom tinted darks. */
+[data-theme='sakura'] {
+  --bg: #18121a;
+  --bg-elev: #22182a;
+  --bg-elev-2: #2d2034;
+  --bg-hover: #3a2940;
+  --fg: #f3e4ee;
+  --fg-dim: #c5a4bf;
+  --fg-faint: #846b80;
+  --border: #302236;
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.30);
+  --shadow-2: 0 8px 32px rgba(0, 0, 0, 0.45);
+
+  --tile-folder: rgba(255, 138, 191, 0.20);
+  --tile-image: rgba(255, 178, 200, 0.14);
+  --tile-video: rgba(255, 138, 191, 0.14);
+  --tile-audio: rgba(255, 207, 138, 0.14);
+  --tile-doc: rgba(200, 170, 195, 0.10);
+}
+
+/* Hover accent — slightly lighter variant. We compute it from --accent via
+ * a color-mix if available; fall back to a fixed tint for old browsers. */
+:root {
+  --accent-hover: color-mix(in srgb, var(--accent), white 18%);
+}

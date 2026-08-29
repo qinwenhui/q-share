@@ -1,0 +1,42 @@
+[package]
+name = "qshare-gui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "q-share native GUI (iced) — zero-config directory picker + live dashboard"
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[[bin]]
+name = "qshare"
+path = "src/main.rs"
+
+[dependencies]
+qshare-core = { path = "../qshare-core" }
+qshare-assets = { path = "../qshare-assets" }
+
+iced.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+clap.workspace = true
+qrcode.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+parking_lot.workspace = true
+if-addrs.workspace = true
+
+# Native file dialog (cross-platform: macOS / Windows / GTK on Linux).
+rfd = { version = "0.15", default-features = false, features = ["xdg-portal", "tokio"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# No extra deps — rfd uses NSOpenPanel natively.
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# No extra deps — rfd uses IFileDialog natively.

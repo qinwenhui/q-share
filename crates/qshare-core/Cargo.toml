@@ -1,0 +1,41 @@
+[package]
+name = "qshare-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Core library: axum HTTP server, FS sandbox, dir cache, FS watcher, thumbnails, mDNS discovery, connection stats."
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[dependencies]
+tokio = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+mime_guess = { workspace = true }
+percent-encoding = { workspace = true }
+async-stream = { workspace = true }
+futures = { workspace = true }
+parking_lot = { workspace = true }
+bytes = "1"
+once_cell = "1"
+dashmap = { workspace = true }
+uuid = { workspace = true }
+qshare-assets = { path = "../qshare-assets" }
+notify = { workspace = true }
+notify-debouncer-full = { workspace = true }
+tokio-stream = { version = "0.1", features = ["sync"] }
+image = { workspace = true }
+sha2 = { workspace = true }
+md-5 = { workspace = true }
+mdns-sd = { workspace = true }
+ignore = { workspace = true }

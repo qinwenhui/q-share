@@ -1,0 +1,22 @@
+# Rust
+target/
+
+# Node / frontend
+node_modules/
+web/dist/
+web/node_modules/
+web/tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# OS / editor cruft
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*.orig
+*.rej
+
+# Logs & runtime cache
+*.log
+.cache/

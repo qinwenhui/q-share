@@ -1,0 +1,238 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# Release builds are heavier than CI — let them finish, don't cancel.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_NET_RETRY: 10
+  RUST_BACKTRACE: short
+
+permissions:
+  contents: write
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────
+  # 1. Frontend build — produces web/dist that every Rust job consumes.
+  # ─────────────────────────────────────────────────────────────────────
+  web:
+    name: Build frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install npm dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: web
+        run: npm run build
+
+      - name: Upload web/dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────
+  # 2. Build matrix — every binary on every platform we ship.
+  #    CLI  : Linux + macOS (x86_64 + aarch64) + Windows
+  #    TUI  : same
+  #    GUI  : macOS + Windows only (iced/wgpu on Linux CI is GPU-unreliable)
+  # ─────────────────────────────────────────────────────────────────────
+  build:
+    name: build (${{ matrix.label }})
+    needs: web
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ── CLI ──
+          - label: qshare-cli / x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bin: qshare-cli
+            archive: tar.xz
+          - label: qshare-cli / x86_64-apple-darwin
+            os: macos-latest
+            target: x86_64-apple-darwin
+            bin: qshare-cli
+            archive: tar.xz
+          - label: qshare-cli / aarch64-apple-darwin
+            os: macos-latest
+            target: aarch64-apple-darwin
+            bin: qshare-cli
+            archive: tar.xz
+          - label: qshare-cli / x86_64-pc-windows-msvc
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: qshare-cli.exe
+            archive: zip
+
+          # ── TUI ──
+          - label: qshare-tui / x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bin: qshare-tui
+            archive: tar.xz
+          - label: qshare-tui / x86_64-apple-darwin
+            os: macos-latest
+            target: x86_64-apple-darwin
+            bin: qshare-tui
+            archive: tar.xz
+          - label: qshare-tui / aarch64-apple-darwin
+            os: macos-latest
+            target: aarch64-apple-darwin
+            bin: qshare-tui
+            archive: tar.xz
+          - label: qshare-tui / x86_64-pc-windows-msvc
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: qshare-tui.exe
+            archive: zip
+
+          # ── GUI (macOS + Windows only) ──
+          - label: qshare / x86_64-apple-darwin
+            os: macos-latest
+            target: x86_64-apple-darwin
+            bin: qshare
+            archive: tar.xz
+          - label: qshare / aarch64-apple-darwin
+            os: macos-latest
+            target: aarch64-apple-darwin
+            bin: qshare
+            archive: tar.xz
+          - label: qshare / x86_64-pc-windows-msvc
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: qshare.exe
+            archive: zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            crates/qshare-core
+            crates/qshare-cli
+            crates/qshare-tui
+            crates/qshare-gui
+            crates/qshare-assets
+
+      - name: Download web/dist
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+
+      # Map bin → package. CLI = qshare-cli, TUI = qshare-tui, GUI = qshare-gui.
+      - name: cargo build --release
+        run: |
+          case "${{ matrix.bin }}" in
+            qshare-cli) PKG=qshare-cli ;;
+            qshare-tui) PKG=qshare-tui ;;
+            qshare)     PKG=qshare-gui ;;
+            *) echo "unknown bin ${{ matrix.bin }}"; exit 1 ;;
+          esac
+          cargo build --release --locked -p "$PKG" --target ${{ matrix.target }}
+          shell=$BASH
+
+      - name: Stage binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/${{ matrix.bin }}" dist/
+
+      - name: Smoke test (--version)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./dist/${{ matrix.bin }} --version
+
+      - name: Package archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          ARCHIVE_NAME="${{ github.event.repository.name }}-${{ matrix.target }}"
+          if [[ "${{ matrix.archive }}" == "tar.xz" ]]; then
+            tar -cJf "${ARCHIVE_NAME}.tar.xz" "${{ matrix.bin }}"
+            echo "ASSET=${ARCHIVE_NAME}.tar.xz" >> "$GITHUB_ENV"
+          else
+            # zip on Windows
+            7z.exe a "${ARCHIVE_NAME}.zip" "${{ matrix.bin }}" > /dev/null
+            echo "ASSET=${ARCHIVE_NAME}.zip" >> "$GITHUB_ENV"
+          fi
+
+      - name: Upload artifact (for debugging)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.label }}
+          path: dist/${{ env.ASSET }}
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────
+  # 3. Publish GitHub Release with all archives + checksums.
+  # ─────────────────────────────────────────────────────────────────────
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: ls -la artifacts
+
+      - name: Flatten archives into one directory
+        run: |
+          mkdir -p release-assets
+          find artifacts -maxdepth 2 -type f \( -name "*.tar.xz" -o -name "*.zip" \) \
+            -exec cp {} release-assets/ \;
+          ls -la release-assets
+
+      - name: Generate SHA256 checksums
+        working-directory: release-assets
+        run: |
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum -- * > SHA256SUMS
+          else
+            shasum -a 256 -- * > SHA256SUMS
+          fi
+          cat SHA256SUMS
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release-assets/*
+          fail_on_unmatched_files: false
