@@ -33,7 +33,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: web/package-lock.json
 
@@ -152,10 +152,13 @@ jobs:
           path: web/dist
 
       # Map bin → package. CLI = qshare-cli, TUI = qshare-tui, GUI = qshare-gui.
+      # Windows 的 bin 带 .exe 后缀（qshare-cli.exe），先去掉再匹配。
       - name: cargo build --release
         shell: bash
         run: |
-          case "${{ matrix.bin }}" in
+          bin="${{ matrix.bin }}"
+          bin="${bin%.exe}"
+          case "$bin" in
             qshare-cli) PKG=qshare-cli ;;
             qshare-tui) PKG=qshare-tui ;;
             qshare)     PKG=qshare-gui ;;
@@ -216,7 +219,8 @@ jobs:
       - name: Upload artifact (for debugging)
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.label }}
+          # matrix.label 含斜杠，artifact 名不允许，改用 bin-target（无斜杠）
+          name: ${{ matrix.bin }}-${{ matrix.target }}
           path: dist/${{ env.ASSET }}
           retention-days: 7
 
