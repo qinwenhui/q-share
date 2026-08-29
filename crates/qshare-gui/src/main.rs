@@ -2673,6 +2673,9 @@ fn main() -> iced::Result {
     // Window chrome. iced's builder `.window()` REPLACES the whole window
     // Settings, so size/position must be baked in here — any chained
     // `.window_size()`/`.centered()` after it would be silently dropped.
+    // `mut` is only consumed by the macOS block below; on other platforms
+    // (e.g. ubuntu CI) it's unused, so allow it there rather than lint-fail.
+    #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
     let mut window_settings = iced::window::Settings {
         size: Size::new(820.0, 540.0),
         position: iced::window::Position::Centered,
