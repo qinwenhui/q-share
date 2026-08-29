@@ -533,6 +533,73 @@ mod icon {
     }
 }
 
+// ─── App icon (window chrome / Dock / Explorer) ────────────────────────────
+//
+// The static hero frame of the pixel campfire, on a dark rounded tile.
+// Source + generator live in `assets/` (`gen_icon.py` renders the SVG,
+// the PNG ladder, icon.icns and icon.ico from one 32×32 pixel map).
+mod app_icon {
+    /// 128×128 PNG. Window icons render at ≤64 logical px on every
+    /// platform, so 128 keeps HiDPI crisp without bloating the binary.
+    pub const PNG_128: &[u8] = include_bytes!("../assets/icon-128.png");
+
+    /// Decode the embedded PNG into an iced window icon (title bar /
+    /// taskbar on Windows, X11 on Linux). macOS ignores window icons —
+    /// the Dock is handled by `set_dock_icon` and an .app bundle's icns.
+    pub fn window_icon() -> Option<iced::window::Icon> {
+        let img = image::load_from_memory(PNG_128).ok()?.to_rgba8();
+        let (width, height) = img.dimensions();
+        iced::window::icon::from_rgba(img.into_raw(), width, height).ok()
+    }
+
+    /// Bare `qshare` binaries (e.g. `cargo run`) carry no .app bundle, so
+    /// macOS would show the generic executable icon in the Dock. Hand
+    /// NSApplication our icon at boot as a best-effort fix — the reliable
+    /// path is the packaged .app (bundle-macos.sh / release.yml), which
+    /// sets AppIcon.icns. Harmless for a bundled .app.
+    #[cfg(target_os = "macos")]
+    pub fn set_dock_icon() {
+        use objc2::ClassType;
+        use objc2_app_kit::{NSApplication, NSBitmapImageRep, NSImage};
+        use objc2_foundation::{MainThreadMarker, NSData};
+
+        // objc2 0.2 requires a MainThreadMarker — `new()` returns None if
+        // we're not on the main thread, which would be a programming error
+        // here (called from `run_with` on the main thread).
+        let Some(_mtm) = MainThreadMarker::new() else {
+            tracing::warn!("dock icon: not on the main thread");
+            return;
+        };
+
+        let data = unsafe {
+            // dataWithBytes:length: copies the buffer, so handing it a
+            // pointer into our `'static` PNG bytes is sound.
+            NSData::dataWithBytes_length(
+                PNG_128.as_ptr() as *mut std::ffi::c_void,
+                PNG_128.len() as _,
+            )
+        };
+
+        // Decode the PNG into an NSBitmapImageRep *now*. A bare NSImage made
+        // from data defers decoding until first draw, so if the icon is set
+        // and then the NSData is dropped, the Dock shows a blank/exec glyph.
+        // NSBitmapImageRep::initWithData fully decodes into owned bitmap
+        // memory that survives independently of the NSData.
+        let Some(rep) =
+            (unsafe { NSBitmapImageRep::initWithData(NSBitmapImageRep::alloc(), &data) })
+        else {
+            tracing::warn!("dock icon: PNG failed to decode into bitmap rep");
+            return;
+        };
+        let image = unsafe { NSImage::initWithSize(NSImage::alloc(), rep.size()) };
+        unsafe {
+            image.addRepresentation(&rep);
+            NSApplication::sharedApplication(_mtm).setApplicationIconImage(Some(&image));
+        }
+        tracing::debug!("dock icon set");
+    }
+}
+
 // ─── State ─────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
@@ -2679,6 +2746,7 @@ fn main() -> iced::Result {
     let mut window_settings = iced::window::Settings {
         size: Size::new(820.0, 540.0),
         position: iced::window::Position::Centered,
+        icon: app_icon::window_icon(),
         ..Default::default()
     };
     // macOS: hide the native title text, make the title bar transparent and
@@ -2700,5 +2768,14 @@ fn main() -> iced::Result {
         .window(window_settings)
         // Ask the runtime for the window id once it exists, so the header
         // brand can start a native window drag.
-        .run_with(move || (boot, iced::window::get_oldest().map(Message::WindowReady)))
+        .run_with(move || {
+            // macOS: bare binaries have no bundle icns, so set the Dock icon
+            // from the embedded PNG. Done inside `run_with` (not before it)
+            // because winit must have finished NSApplication initialization
+            // first — an icon set before that gets reset to the generic
+            // executable glyph when the app finishes launching.
+            #[cfg(target_os = "macos")]
+            app_icon::set_dock_icon();
+            (boot, iced::window::get_oldest().map(Message::WindowReady))
+        })
 }

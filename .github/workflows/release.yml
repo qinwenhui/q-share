@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*"
+  # 手动触发：可以用来提前检查release的打包情况
+  workflow_dispatch:
 
 # Release builds are heavier than CI — let them finish, don't cancel.
 concurrency:
@@ -161,18 +163,37 @@ jobs:
           esac
           cargo build --release --locked -p "$PKG" --target ${{ matrix.target }}
 
+      # macOS GUI ships as a proper .app bundle — a bare binary has no icon
+      # in the Dock/Finder. Assemble q-share.app (Info.plist + AppIcon.icns),
+      # ad-hoc sign it, and stage the bundle. Everything else stays a bare
+      # binary (CLI/TUI, or Windows GUI which uses the embedded .ico).
       - name: Stage binary
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp "target/${{ matrix.target }}/release/${{ matrix.bin }}" dist/
+          if [[ "${{ matrix.os }}" == "macos-latest" && "${{ matrix.bin }}" == "qshare" ]]; then
+            bundle="dist/q-share.app"
+            mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
+            sed -e "s/@VERSION@/${GITHUB_REF_NAME#v}/g" \
+                -e "s/@YEAR@/$(date +%Y)/g" \
+                packaging/Info.plist > "$bundle/Contents/Info.plist"
+            cp "target/${{ matrix.target }}/release/qshare" "$bundle/Contents/MacOS/qshare"
+            cp crates/qshare-gui/assets/icon.icns "$bundle/Contents/Resources/AppIcon.icns"
+            codesign --force --deep --sign - "$bundle"
+          else
+            cp "target/${{ matrix.target }}/release/${{ matrix.bin }}" dist/
+          fi
 
       - name: Smoke test (--version)
         shell: bash
         run: |
           set -euo pipefail
-          ./dist/${{ matrix.bin }} --version
+          if [[ "${{ matrix.os }}" == "macos-latest" && "${{ matrix.bin }}" == "qshare" ]]; then
+            ./dist/q-share.app/Contents/MacOS/qshare --version
+          else
+            ./dist/${{ matrix.bin }} --version
+          fi
 
       - name: Package archive
         shell: bash
@@ -180,7 +201,10 @@ jobs:
           set -euo pipefail
           cd dist
           ARCHIVE_NAME="${{ github.event.repository.name }}-${{ matrix.target }}"
-          if [[ "${{ matrix.archive }}" == "tar.xz" ]]; then
+          if [[ "${{ matrix.os }}" == "macos-latest" && "${{ matrix.bin }}" == "qshare" ]]; then
+            tar -cJf "${ARCHIVE_NAME}.tar.xz" q-share.app
+            echo "ASSET=${ARCHIVE_NAME}.tar.xz" >> "$GITHUB_ENV"
+          elif [[ "${{ matrix.archive }}" == "tar.xz" ]]; then
             tar -cJf "${ARCHIVE_NAME}.tar.xz" "${{ matrix.bin }}"
             echo "ASSET=${ARCHIVE_NAME}.tar.xz" >> "$GITHUB_ENV"
           else
@@ -201,6 +225,9 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────
   release:
     name: Publish GitHub Release
+    # 手动触发（workflow_dispatch）只验证打包产物，不创建 Release——
+    # 没有 git tag 时 softprops/action-gh-release 会失败。
+    if: github.event_name == 'push'
     needs: build
     runs-on: ubuntu-latest
     steps:

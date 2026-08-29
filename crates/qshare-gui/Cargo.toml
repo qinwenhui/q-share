@@ -31,12 +31,32 @@ serde_json.workspace = true
 anyhow.workspace = true
 parking_lot.workspace = true
 if-addrs.workspace = true
+# Decode the embedded app icon PNG at boot (window icon / Dock icon).
+image.workspace = true
 
 # Native file dialog (cross-platform: macOS / Windows / GTK on Linux).
 rfd = { version = "0.15", default-features = false, features = ["xdg-portal", "tokio"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-# No extra deps — rfd uses NSOpenPanel natively.
+# Set the Dock icon at boot (bare binaries carry no bundle icns).
+# Versions track the copies already in the tree via winit (0.2.x).
+objc2-app-kit = { version = "0.2", features = ["NSApplication", "NSImage", "NSBitmapImageRep"] }
+objc2-foundation = "0.2"
+# Only for `objc2::top_level_traits::ClassType` (NSImage::alloc); already in
+# the dependency tree via app-kit, so this adds no new version.
+objc2 = "0.5"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 # No extra deps — rfd uses IFileDialog natively.
+
+[build-dependencies]
+# Embeds assets/icon.ico into the Windows executable (Explorer icon).
+winresource = "0.1"
+
+[package.metadata.bundle]
+# Used by `cargo bundle` / cargo-bundle when packaging a real .app/.msi.
+name = "q-share"
+identifier = "dev.qshare.app"
+icon = ["assets/icon.icns", "assets/icon.ico", "assets/icon-32.png", "assets/icon-128.png"]
+category = "public.app-category.utilities"
+short_description = "Zero-config LAN file sharing"

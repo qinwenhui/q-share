@@ -1,6 +1,9 @@
 # Rust
 target/
 
+# Local packaging output (bundle-macos.sh, etc.)
+dist/
+
 # Node / frontend
 node_modules/
 web/dist/
